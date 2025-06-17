@@ -24,18 +24,3 @@ type Project struct {
 	Title             string   `json:"title"`              // "Sodium"
 	Versions          []string `json:"versions"`           // ["1.21.5", "1.21.4", ...]
 }
-
-type SearchResponse struct {
-	Hits      []Project `json:"hits"`       // how many results
-	Offset    int       `json:"offset"`   // pagination
-	Limit     int       `json:"limit"` // pagination
-	TotalHits int       `json:"total_hits"` // pagination
-}
-
-type SearchParams struct {
-	Query  string   // "sodium"
-	Facets []string // ["categories=fabric", "project_type=mod"]
-	Offset int      // pagination
-	Limit  int      //pagination
-}
-
