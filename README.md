@@ -15,7 +15,7 @@ A command-line tool to manage Minecraft mods, resource packs, and shaders using 
 
 ```sh
 mod init [DIRECTORY]           # Create a new project manifest
-mod add <slug|url> [--to DIR]  # Add a mod by slug or URL
+mod add <slug> [--to DIR]      # Add a mod by slug
 mod list                       # List all manifest entries
 mod enable <slug> [...]        # Enable mods
 mod disable <slug> [...]       # Disable mods
@@ -35,6 +35,7 @@ See `mod <command> --help` for more options.
 - [ ] Unit tests
 - [ ] Actually make resourcepacks and shader installation work
 - [ ] Figure stuff out for releases
+- [ ] Fuzzy Search for enabling/disabling/removing items
 ---
 
 MIT License or something
