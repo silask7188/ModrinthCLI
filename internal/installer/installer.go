@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/silask7188/modrinth-cli/internal/manifest"
-	"github.com/silask7188/modrinth-cli/internal/modrinth"
+	"github.com/silask7188/ModrinthCLI/internal/manifest"
+	"github.com/silask7188/ModrinthCLI/internal/modrinth"
 )
 
 /*

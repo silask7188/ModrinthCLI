@@ -1,4 +1,4 @@
-module github.com/silask7188/modrinth-cli
+module github.com/silask7188/ModrinthCLI
 
 go 1.24
 

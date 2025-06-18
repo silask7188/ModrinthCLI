@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/silask7188/modrinth-cli/internal/modrinth"
+	"github.com/silask7188/ModrinthCLI/internal/modrinth"
 )
 
 const Version = 0
@@ -223,3 +223,4 @@ func toggleDisabled(gameDir string, mods []Entry, slug string, wantEnable bool) 
 	}
 	return fmt.Errorf("slug %s not in manifest", slug)
 }
+

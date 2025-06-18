@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/silask7188/modrinth-cli/internal/manifest"
+	"github.com/silask7188/ModrinthCLI/internal/manifest"
 	"github.com/spf13/cobra"
 )
 
