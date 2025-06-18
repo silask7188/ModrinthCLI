@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: {go-version: "1.24"}
       - run: |
-          GOOS=linux GOARCH=amd64 go build -o mod ./cmd/mod
+          GOOS=linux GOARCH=amd64 go build -o mod
           tar -czf mod_${{ github.ref_name }}_linux_x86_64.tar.gz mod
       - id: create_release
         uses: actions/create-release@v1
