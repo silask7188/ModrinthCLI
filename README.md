@@ -18,6 +18,8 @@ I may port this to a minecraft server manager because I have been looking for on
 ```sh
 mod init [DIRECTORY]           # Create a new project manifest
 mod add <slug> [--to DIR]      # Add a mod by slug
+mod remove <slug>              # Remove and delete an item from the manifest
+mod search <query>             # Search for an item on Modrinth
 mod list                       # List all manifest entries
 mod enable <slug> [...]        # Enable mods
 mod disable <slug> [...]       # Disable mods
