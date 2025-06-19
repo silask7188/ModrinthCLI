@@ -14,9 +14,13 @@ var installCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		m, err := manifest.Load(filepath.Join(gameDir, manifestRel))
 		if err != nil {
+			println("Manifest not found. Create one with 'mod init --mc [version] --loader [loader]\n")
 			return err
 		}
 		inst, err := installer.New(gameDir, m)
+		if err != nil {
+			return err
+		}
 		if err := inst.Install(cmd.Context()); err != nil {
 			return err
 		}

@@ -20,6 +20,7 @@ var disableCmd = &cobra.Command{
 
 		m, err := manifest.Load(filepath.Join(gameDir, manifestRel))
 		if err != nil {
+			println("Manifest not found. Create one with 'mod init --mc [version] --loader [loader]\n")
 			return err
 		}
 

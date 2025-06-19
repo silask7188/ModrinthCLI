@@ -82,7 +82,6 @@ func (m *Manifest) Add(ctx context.Context, slug, dest string) error {
 
 	gameVer := m.Minecraft.Version
 	loader := m.Minecraft.Loader
-
 	needLooseSearch := prj.ProjectType == "resourcepack" || prj.ProjectType == "shader"
 
 	vers, err := cli.ProjectVersions(ctx, slug, gameVer, func() string {
@@ -108,7 +107,8 @@ func (m *Manifest) Add(ctx context.Context, slug, dest string) error {
 	}
 	latest := vers[0] // newest -> oldest
 
-	if prj.ProjectType == "mod" {
+	switch prj.ProjectType {
+	case "mod":
 		for i := range m.Mods {
 			if m.Mods[i].Slug == slug {
 				m.Mods[i].Dest = "mods"
@@ -118,7 +118,16 @@ func (m *Manifest) Add(ctx context.Context, slug, dest string) error {
 				return nil
 			}
 		}
-	} else if prj.ProjectType == "resourcepack" {
+		// Not found, add new
+		m.Mods = append(m.Mods, Entry{
+			Slug:          slug,
+			Dest:          "mods",
+			Version:       latest.ID,
+			VersionNumber: latest.VersionNumber,
+			Enable:        true,
+		})
+		return nil
+	case "resourcepack":
 		for i := range m.ResourcePacks {
 			if m.ResourcePacks[i].Slug == slug {
 				m.ResourcePacks[i].Dest = "resourcepacks"
@@ -128,7 +137,15 @@ func (m *Manifest) Add(ctx context.Context, slug, dest string) error {
 				return nil
 			}
 		}
-	} else if prj.ProjectType == "shader" {
+		m.ResourcePacks = append(m.ResourcePacks, Entry{
+			Slug:          slug,
+			Dest:          "resourcepacks",
+			Version:       latest.ID,
+			VersionNumber: latest.VersionNumber,
+			Enable:        true,
+		})
+		return nil
+	case "shader":
 		for i := range m.Shaders {
 			if m.Shaders[i].Slug == slug {
 				m.Shaders[i].Dest = "shaderpacks"
@@ -138,18 +155,17 @@ func (m *Manifest) Add(ctx context.Context, slug, dest string) error {
 				return nil
 			}
 		}
-	} else {
+		m.Shaders = append(m.Shaders, Entry{
+			Slug:          slug,
+			Dest:          "shaderpacks",
+			Version:       latest.ID,
+			VersionNumber: latest.VersionNumber,
+			Enable:        true,
+		})
+		return nil
+	default:
 		return fmt.Errorf("unknown project type %q for slug %q", prj.ProjectType, slug)
 	}
-
-	m.Mods = append(m.Mods, Entry{
-		Slug:          slug,
-		Version:       latest.ID,
-		VersionNumber: latest.VersionNumber,
-		Dest:          dest,
-		Enable:        true,
-	})
-	return nil
 }
 
 // @brief get all enabled entries in the manifest
@@ -224,3 +240,68 @@ func toggleDisabled(gameDir string, mods []Entry, slug string, wantEnable bool) 
 	return fmt.Errorf("slug %s not in manifest", slug)
 }
 
+// @brief remove an item from a specific section of the manifest.
+// @param section the section to remove from (mods, resourcepacks, shaders)
+// @param slug modrinth project slug
+// @return error if the item was not found or could not be removed
+func (m *Manifest) RemoveFromSection(section string, slug string) error {
+	var mods *[]Entry
+	switch section {
+	case "mods":
+		mods = &m.Mods
+	case "resourcepacks":
+		mods = &m.ResourcePacks
+	case "shaders":
+		mods = &m.Shaders
+	default:
+		return fmt.Errorf("unknown section %q", section)
+	}
+
+	for i := range *mods {
+		if (*mods)[i].Slug == slug {
+			*mods = append((*mods)[:i], (*mods)[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("slug %s not found in section %s", slug, section)
+}
+
+// @brief Remove an entry from the manifest and delete its file from disk.
+// @param gameDir path to the game directory
+// @param slug modrinth project slug
+// @return error if the entry was not found or could not be removed
+func (m *Manifest) Remove(gameDir, slug string) error {
+	sections := []struct {
+		name    string
+		entries *[]Entry
+	}{
+		{"mods", &m.Mods},
+		{"resourcepacks", &m.ResourcePacks},
+		{"shaders", &m.Shaders},
+	}
+
+	for _, sec := range sections {
+		for i := range *sec.entries {
+			if (*sec.entries)[i].Slug != slug {
+				continue
+			}
+
+			entry := (*sec.entries)[i]
+
+			// Delete file from disk (if filename is set)
+			if entry.Filename != "" {
+				dir := filepath.Join(gameDir, entry.Dest)
+				path := filepath.Join(dir, entry.Filename)
+				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("failed to remove file %q: %w", path, err)
+				}
+			}
+
+			// Remove from manifest
+			*sec.entries = append((*sec.entries)[:i], (*sec.entries)[i+1:]...)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("slug %s not found in any section", slug)
+}

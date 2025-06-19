@@ -18,13 +18,22 @@ var listCmd = &cobra.Command{
 			return err
 		}
 		tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "\tTYPE\tSLUG")
+		// println("MODS")
+		fmt.Fprintln(tw, "\tITEM\tVERSION\tTYPE")
 		for _, e := range m.Mods {
 			en := "✓"
 			if !e.Enable {
 				en = "x"
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", en, e.Dest, e.Slug)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", en, e.Slug, e.VersionNumber, e.Dest)
+		}
+		// println("RESOURCE PACKS")
+		for _, e := range m.ResourcePacks {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", "", e.Slug, e.VersionNumber, e.Dest)
+		}
+		// println("SHADERS")
+		for _, e := range m.Shaders {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", "", e.Slug, e.VersionNumber, e.Dest)
 		}
 		return tw.Flush()
 	},

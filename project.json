@@ -1,0 +1,11 @@
+{
+ "schema": 0,
+ "minecraft": {
+  "loader": "fabric",
+  "loader_version": "latest",
+  "minecraft_version": "1.21.6"
+ },
+ "mods": null,
+ "resourcepacks": null,
+ "shaders": null
+}

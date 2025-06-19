@@ -19,11 +19,12 @@ var addCmd = &cobra.Command{
 		path := filepath.Join(gameDir, manifestRel)
 		m, err := manifest.Load(path)
 		if err != nil {
+			println("Manifest not found. Create one with 'mod init --mc [version] --loader [loader]\n")
 			return err
 		}
 
 		slug := modrinth.ParseSlug(args[0])
-		fmt.Printf("Resolving %s …\n", slug)
+		fmt.Printf("Resolving %s...\n", slug)
 
 		if err := m.Add(cmd.Context(), slug, dest); err != nil {
 			return err
@@ -37,6 +38,19 @@ var addCmd = &cobra.Command{
 				if e.Slug == slug {
 					dest = e.Dest
 				}
+			}
+			for _, e := range m.ResourcePacks {
+				if e.Slug == slug {
+					dest = e.Dest
+				}
+			}
+			for _, e := range m.Shaders {
+				if e.Slug == slug {
+					dest = e.Dest
+				}
+			}
+			if dest == "" {
+				return fmt.Errorf("could not determine destination for %s", slug)
 			}
 		}
 		fmt.Printf("Added %s -> %s\n", slug, dest)

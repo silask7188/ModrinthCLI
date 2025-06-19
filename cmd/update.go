@@ -23,6 +23,9 @@ var updateCmd = &cobra.Command{
 
 		print("Checking for mods not yet installed...\n")
 		inst, err := installer.New(gameDir, m)
+		if err != nil {
+			return fmt.Errorf("failed to create installer: %w", err)
+		}
 		if err := inst.Install(cmd.Context()); err != nil {
 			return err
 		}
@@ -44,7 +47,7 @@ var updateCmd = &cobra.Command{
 			} else if p.CurrentVersion == p.TargetVersion {
 				fmt.Printf("[=] %-20s  %s -> %s (already up-to-date)\n", p.Entry.Slug, p.CurrentVersion, p.TargetVersion)
 			} else if p.TargetVersion == "" {
-				fmt.Printf("[ ] %-20s  %s -> %s (no compatible version found)\n", p.Entry.Slug, p.CurrentVersion, p.TargetVersion)
+				fmt.Printf("[x] %-20s  %s -> %s (no compatible version found)\n", p.Entry.Slug, p.CurrentVersion, p.TargetVersion)
 			} else if p.TargetVersion == "latest" {
 				fmt.Printf("[ ] %-20s  %s -> %s (latest)\n", p.Entry.Slug, p.CurrentVersion, p.TargetVersion)
 				total++

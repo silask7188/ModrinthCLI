@@ -64,12 +64,13 @@ func New(gameDir string, man *manifest.Manifest) (*Installer, error) {
 // @param ctx context for cancellation
 // @return error if any
 func (ins *Installer) Install(ctx context.Context) error {
-	entries := ins.man.Enabled()
+	nonmods := append(ins.man.ResourcePacks, ins.man.Shaders...)
+	entries := append(ins.man.Enabled(), nonmods...)
 
 	grp, ctx := errgroup.WithContext(ctx)
 	grp.SetLimit(ins.concur)
 	for i := range entries {
-		ent := &ins.man.Mods[i]
+		ent := &entries[i]
 		if !ent.Enable {
 			// skip disabled entries
 			continue
@@ -168,12 +169,33 @@ func (ins *Installer) installOne(ctx context.Context, e *manifest.Entry) error {
 // @param e manifest entry to resolve
 // @return version ID or error
 func (ins *Installer) resolveVersion(ctx context.Context, e manifest.Entry) (string, error) {
-	vers, err := ins.api.ProjectVersions(
-		ctx,
-		e.Slug,
-		ins.man.Minecraft.Version,
-		ins.man.Minecraft.Loader,
-	)
+	var vers []modrinth.Version
+	var err error
+	switch e.Dest {
+	case "mods":
+		vers, err = ins.api.ProjectVersions(
+			ctx,
+			e.Slug,
+			ins.man.Minecraft.Version,
+			ins.man.Minecraft.Loader,
+		)
+	case "resourcepacks":
+		vers, err = ins.api.ProjectVersions(
+			ctx,
+			e.Slug,
+			ins.man.Minecraft.Version,
+			"",
+		)
+	case "shaderpacks":
+		vers, err = ins.api.ProjectVersions(
+			ctx,
+			e.Slug,
+			ins.man.Minecraft.Version,
+			"",
+		)
+	default:
+		return "", fmt.Errorf("unknown type %q for %s", e.Dest, e.Slug)
+	}
 	if err != nil {
 		return "", err
 	}

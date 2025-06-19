@@ -120,3 +120,5 @@ func (c *Client) GetProject(ctx context.Context, p ProjectQuery) (*Project, erro
 	path := fmt.Sprintf("project/%s", url.PathEscape(token))
 	return getJSON[Project](ctx, c, path, nil)
 }
+
+//

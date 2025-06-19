@@ -19,7 +19,7 @@ type Manifest struct {
 	Schema        int       `json:"schema"` // modrinth-cli ver
 	Minecraft     Minecraft `json:"minecraft"`
 	Mods          []Entry   `json:"mods"`
-	ResourcePacks []Entry   `json:"resource_packs"`
+	ResourcePacks []Entry   `json:"resourcepacks"`
 	Shaders       []Entry   `json:"shaders"`
 	path          string    // absolute
 }
