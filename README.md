@@ -27,14 +27,13 @@ See `mod <command> --help` for more options.
 
 ## TODO
 
-- [ ] Add support for removing mods from the manifest
-- [ ] Add search and filter commands
+- [x] Add support for removing mods from the manifest
+- [x] Add search TODO: resourcepacks, shaderpacks
 - [ ] Improve error messages and logging
 - [ ] Support for curseforge
 - [ ] Support for custom jars and resource packs?
 - [ ] Unit tests
-- [ ] Actually make resourcepacks and shader installation work
-- [ ] Figure stuff out for releases
+- [x] Actually make resourcepacks and shader installation work
 - [ ] Fuzzy Search for enabling/disabling/removing items
 ---
 
