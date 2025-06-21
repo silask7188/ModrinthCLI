@@ -21,8 +21,8 @@ type SearchParams struct {
 }
 
 type Facets struct {
-	ProjectType string `json:"project_type,omitempty"` // ["mod", "resource_pack", "shader"]
-	Loader      string `json:"loader,omitempty"`       // ["fabric", "forge", "neoforge"]
+	ProjectType []string `json:"project_type,omitempty"` // ["mod", "resource_pack", "shader"]
+	Loader      string   `json:"loader,omitempty"`       // ["fabric", "forge", "neoforge"]
 	// LoaderVersion    string   `json:"loader_version,omitempty"`    // ["1.6.5", "1.7.10"]
 	MinecraftVersion string   `json:"minecraft_version,omitempty"` // ["1.21.6", "1.20.5"]
 	Category         []string `json:"categories,omitempty"`        // ["tech", "exploration", "quality-of-life"]
@@ -40,8 +40,8 @@ func (p SearchParams) Values() url.Values {
 	// Build facets array - each facet should be in its own array for AND logic
 	var facetArrays []string
 
-	if p.Facets.ProjectType != "" {
-		facetArrays = append(facetArrays, fmt.Sprintf(`["project_type:%s"]`, p.Facets.ProjectType))
+	for _, pt := range p.Facets.ProjectType {
+		facetArrays = append(facetArrays, fmt.Sprintf(`["project_type:%s"]`, pt))
 	}
 	if p.Facets.Loader != "" {
 		facetArrays = append(facetArrays, fmt.Sprintf(`["categories:%s"]`, p.Facets.Loader))

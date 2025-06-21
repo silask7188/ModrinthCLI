@@ -2,16 +2,19 @@ package manifest
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/silask7188/ModrinthCLI/internal/modrinth"
 )
 
-const Version = 0
+const Version = 1
 
 // @brief load a manifest from disk
 // @param path path to the manifest file
@@ -26,6 +29,7 @@ func Load(path string) (*Manifest, error) {
 		return nil, err
 	}
 	m.path = path
+	m.baseDir = filepath.Dir(path)
 	return &m, nil
 }
 
@@ -38,6 +42,7 @@ func New(path string, mc Minecraft) *Manifest {
 		Schema:    Version,
 		Minecraft: mc,
 		path:      path,
+		baseDir:   filepath.Dir(path),
 	}
 }
 
@@ -206,35 +211,45 @@ func (m *Manifest) Disable(gameDir, slug string) error {
 // @param slug modrinth project slug
 // @param wantEnable true to enable, false to disable
 // @return error if the mod was not found or could not be toggled
-func toggleDisabled(gameDir string, mods []Entry, slug string, wantEnable bool) error {
-	for i := range mods {
-		ent := &mods[i]
+func toggleDisabled(gameDir string, entries []Entry, slug string, wantEnable bool) error {
+	for i := range entries {
+		ent := &entries[i]
 		if ent.Slug != slug {
 			continue
 		}
 		ent.Enable = wantEnable
 
-		if ent.Filename == "" {
-			return fmt.Errorf("no filename recorded for %s; reinstall first", slug)
+		dir := filepath.Join(gameDir, ent.Dest)
+		filename := ent.Filename
+
+		// fallback: scan directory for a file with matching checksum
+		if filename == "" {
+			found, err := findFileByChecksum(dir, ent.Checksum)
+			if err != nil {
+				return fmt.Errorf("no filename recorded for %s and no match by checksum: %w", slug, err)
+			}
+			filename = found
+			ent.Filename = filename // optional: heal the manifest
 		}
 
-		dir := filepath.Join(gameDir, ent.Dest)
-		oldPath := filepath.Join(dir, ent.Filename)
-		disPath := oldPath + ".disabled"
+		enabledPath := filepath.Join(dir, filename)
+		disabledPath := enabledPath + ".disabled"
 
 		var from, to string
 		if wantEnable {
-			from, to = disPath, oldPath
+			from, to = disabledPath, enabledPath
 		} else {
-			from, to = oldPath, disPath
+			from, to = enabledPath, disabledPath
 		}
 
 		if _, err := os.Stat(from); os.IsNotExist(err) {
 			return fmt.Errorf("file %s not found; expected %s", slug, from)
 		}
+
 		if err := os.Rename(from, to); err != nil {
-			return err
+			return fmt.Errorf("failed to toggle %s: %w", slug, err)
 		}
+
 		return nil
 	}
 	return fmt.Errorf("slug %s not in manifest", slug)
@@ -288,13 +303,21 @@ func (m *Manifest) Remove(gameDir, slug string) error {
 
 			entry := (*sec.entries)[i]
 
-			// Delete file from disk (if filename is set)
-			if entry.Filename != "" {
-				dir := filepath.Join(gameDir, entry.Dest)
-				path := filepath.Join(dir, entry.Filename)
-				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("failed to remove file %q: %w", path, err)
+			// Resolve filename
+			filename := entry.Filename
+			if filename == "" {
+				found, err := findFileByChecksum(filepath.Join(gameDir, entry.Dest), entry.Checksum)
+				if err != nil {
+					return fmt.Errorf("could not find file for %s by filename or checksum: %w", slug, err)
 				}
+				filename = found
+				entry.Filename = found
+			}
+
+			// Delete file from disk
+			path := filepath.Join(gameDir, entry.Dest, filename)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove file %q: %w", path, err)
 			}
 
 			// Remove from manifest
@@ -304,4 +327,135 @@ func (m *Manifest) Remove(gameDir, slug string) error {
 	}
 
 	return fmt.Errorf("slug %s not found in any section", slug)
+}
+
+func findFileByChecksum(dir, wantHash string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		ok, err := fileExistsWithSHA1(path, wantHash)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return entry.Name(), nil
+		}
+	}
+	return "", fmt.Errorf("no file with checksum %s found in %s", wantHash, dir)
+}
+
+// @brief computeSHA1 computes the SHA1 hash of a file.
+func computeSHA1(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha1.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// @brief fileExistsWithSHA1 checks if a file exists and matches the given SHA1 hash.
+// @param path file path to check
+// @param want expected SHA1 hash
+// @return true if file exists and matches, false if not, or error if any
+func fileExistsWithSHA1(path, want string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer f.Close()
+
+	h := sha1.New()
+	if _, err = io.Copy(h, f); err != nil {
+		return false, err
+	}
+	return hex.EncodeToString(h.Sum(nil)) == want, nil
+}
+
+// @brief check for filename updates by comparing sha1 hashes.
+// @return error if any filename does not match its checksum
+// @return a list of filenames that do not match their checksums
+func (m *Manifest) CheckFilenames() ([]string, error) {
+	var mismatches []string
+	var changed bool
+
+	check := func(entries *[]Entry) {
+		for i := range *entries {
+			ent := &(*entries)[i]
+
+			if ent.Filename == "" {
+				mismatches = append(mismatches, fmt.Sprintf("%s: no filename recorded, may not exist yet\n", ent.Slug))
+				continue
+			}
+
+			dir := filepath.Join(m.baseDir, ent.Dest)
+			expected := filepath.Join(dir, ent.Filename)
+
+			// check if the expected file matches the checksum ! yipee
+			ok, err := fileExistsWithSHA1(expected, ent.Checksum)
+			if err != nil {
+				mismatches = append(mismatches, fmt.Sprintf("%s: %s\n", ent.Slug, err))
+				continue
+			}
+			if ok {
+				continue // all good
+			}
+
+			// try to find a file in the folder with the right checksum
+			foundName, err := findFileByChecksum(dir, ent.Checksum)
+			if err == nil {
+				mismatches = append(mismatches,
+					fmt.Sprintf("%s: filename changed from %s to %s\n", ent.Slug, ent.Filename, foundName))
+				ent.Filename = foundName
+				changed = true
+				continue
+			}
+
+			// if the original file exists, but has a different checksum !! uh oh!! unless not a mod
+			if _, err := os.Stat(expected); err == nil {
+				actual, err := computeSHA1(expected)
+				if err != nil {
+					mismatches = append(mismatches, fmt.Sprintf("%s: failed to hash %s: %s\n", ent.Slug, expected, err))
+				} else {
+					mismatches = append(mismatches,
+						fmt.Sprintf("%s: %s checksum mismatch (want %s, got %s)\n",
+							ent.Slug, ent.Filename, ent.Checksum, actual))
+				}
+			} else {
+				// file not found at all, and not recoverable by hash
+				mismatches = append(mismatches,
+					fmt.Sprintf("%s: file %s not found and no match by checksum\n", ent.Slug, expected))
+			}
+		}
+	}
+
+	check(&m.Mods)
+	check(&m.ResourcePacks)
+	check(&m.Shaders)
+
+	if changed {
+		err := m.Save()
+		if err != nil {
+			return nil, fmt.Errorf("failed to save manifest after filename updates: %w", err)
+		}
+	}
+
+	if len(mismatches) > 0 {
+		return mismatches, fmt.Errorf("found %d filename or checksum mismatches", len(mismatches))
+	}
+	return nil, nil
 }

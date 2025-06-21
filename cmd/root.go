@@ -21,7 +21,7 @@ func Execute() {
 	rootCmd.PersistentFlags().StringVar(&manifestRel, "manifest", "project.json", "manifest filename")
 
 	// subcommands
-	rootCmd.AddCommand(initCmd, addCmd, listCmd, installCmd, updateCmd, enableCmd, disableCmd, removeCmd, searchCmd)
+	rootCmd.AddCommand(initCmd, addCmd, listCmd, installCmd, updateCmd, enableCmd, disableCmd, removeCmd, searchCmd, checkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

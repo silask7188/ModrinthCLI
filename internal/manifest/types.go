@@ -5,7 +5,8 @@ type Entry struct {
 	Version       string `json:"version"`
 	VersionNumber string `json:"version_number"` // human-readable
 	Dest          string `json:"dest"`
-	Filename      string `json:"filename"`
+	Checksum      string `json:"sha1"`
+	Filename      string `json:"filename"` // file name in the archive
 	Enable        bool   `json:"enable"`
 }
 
@@ -22,4 +23,5 @@ type Manifest struct {
 	ResourcePacks []Entry   `json:"resourcepacks"`
 	Shaders       []Entry   `json:"shaders"`
 	path          string    // absolute
+	baseDir       string    // absolute
 }

@@ -1,4 +1,3 @@
-// internal/installer/installer.go
 package installer
 
 import (
@@ -64,18 +63,27 @@ func New(gameDir string, man *manifest.Manifest) (*Installer, error) {
 // @param ctx context for cancellation
 // @return error if any
 func (ins *Installer) Install(ctx context.Context) error {
-	nonmods := append(ins.man.ResourcePacks, ins.man.Shaders...)
-	entries := append(ins.man.Enabled(), nonmods...)
+	sections := []*[]manifest.Entry{
+		&ins.man.Mods,
+		&ins.man.ResourcePacks,
+		&ins.man.Shaders,
+	}
 
 	grp, ctx := errgroup.WithContext(ctx)
 	grp.SetLimit(ins.concur)
-	for i := range entries {
-		ent := &entries[i]
-		if !ent.Enable {
-			// skip disabled entries
-			continue
+
+	for _, section := range sections {
+		for i := range *section {
+			ent := &(*section)[i]
+			if !ent.Enable {
+				continue
+			}
+			grp.Go(func(ent *manifest.Entry) func() error {
+				return func() error {
+					return ins.installOne(ctx, ent)
+				}
+			}(ent))
 		}
-		grp.Go(func() error { return ins.installOne(ctx, ent) })
 	}
 	return grp.Wait()
 }
@@ -125,7 +133,7 @@ func (ins *Installer) installOne(ctx context.Context, e *manifest.Entry) error {
 		return err
 	}
 
-	file, hash, err := ins.fileForVersion(ctx, verID)
+	file, sha1sum, err := ins.fileForVersion(ctx, verID)
 	if err != nil {
 		return err
 	}
@@ -134,14 +142,26 @@ func (ins *Installer) installOne(ctx context.Context, e *manifest.Entry) error {
 	if err = os.MkdirAll(destDir, 0o755); err != nil {
 		return err
 	}
+
 	destPath := filepath.Join(destDir, file.Filename)
 
-	if ok, _ := fileExistsWithSHA1(destPath, hash); ok {
-		// fmt.Printf("[✓] %s already up-to-date\n", e.Slug)
+	// check if the expected file is already present and valid
+	if ok, _ := fileExistsWithSHA1(destPath, sha1sum); ok {
 		return nil
 	}
 
-	tmp, err := ins.download(ctx, file.URL, hash)
+	// fallback: search for any file with the correct checksum
+	if found, err := findFileByChecksum(destDir, sha1sum); err == nil {
+		// found correct file under a different name — update manifest
+		e.Filename = found
+		e.Checksum = sha1sum
+		e.Version = verID
+		_ = ins.man.Save() // silently save fix
+		return nil
+	}
+
+	// file not found download
+	tmp, err := ins.download(ctx, file.URL, sha1sum)
 	if err != nil {
 		return err
 	}
@@ -150,10 +170,13 @@ func (ins *Installer) installOne(ctx context.Context, e *manifest.Entry) error {
 	if err = backupIfExists(destPath); err != nil {
 		return err
 	}
+
 	if err = os.Rename(tmp, destPath); err != nil {
-		return err
+		return fmt.Errorf("failed to move file to final destination: %w", err)
 	}
 
+	// record updated manifest data
+	e.Checksum = sha1sum
 	e.Filename = file.Filename
 	e.Version = verID
 	if err := ins.man.Save(); err != nil {
@@ -233,12 +256,13 @@ func (ins *Installer) fileForVersion(ctx context.Context, verID string) (*modrin
 --------------------------------------------------
 */
 
-// @brief download fetches a file from the given URL and verifies its SHA1 hash.
+// @brief download fetches a file from the given URL and verifies its SHA256 hash.
 // @param ctx context for cancellation
 // @param url URL to download from
-// @param wantSHA expected SHA1 hash of the file
+// @param wantSHA expected SHA256 hash of the file
 // @return path to the downloaded file or error
 func (ins *Installer) download(ctx context.Context, url, wantSHA string) (string, error) {
+
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	res, err := ins.http.Do(req)
 	if err != nil {
@@ -256,9 +280,13 @@ func (ins *Installer) download(ctx context.Context, url, wantSHA string) (string
 	if _, err = io.Copy(io.MultiWriter(tmp, h), res.Body); err != nil {
 		return "", err
 	}
-	if got := hex.EncodeToString(h.Sum(nil)); got != wantSHA {
+	var got string
+	if got = hex.EncodeToString(h.Sum(nil)); got != wantSHA {
 		return "", fmt.Errorf("sha1 mismatch for %s (want %s, got %s)", url, wantSHA, got)
 	}
+	// fmt.Println("Downloading:", url)
+	// fmt.Println("Expecting SHA-1:", wantSHA)
+	// fmt.Println("Actual SHA-1:", got)
 	return tmp.Name(), nil
 }
 
@@ -289,4 +317,26 @@ func backupIfExists(path string) error {
 		return os.Rename(path, path+"."+ts+".bak")
 	}
 	return nil
+}
+
+func findFileByChecksum(dir, wantHash string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		ok, err := fileExistsWithSHA1(path, wantHash)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return entry.Name(), nil
+		}
+	}
+	return "", fmt.Errorf("no file with checksum %s found in %s", wantHash, dir)
 }

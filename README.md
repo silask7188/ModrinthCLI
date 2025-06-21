@@ -9,6 +9,7 @@ I may port this to a minecraft server manager because I have been looking for on
 ## Features
 
 - Add, enable, disable, and list mods
+- Search for Modrinth projects
 - Install and update mods from Modrinth
 - Supports multiple loaders (fabric, neoforge, etc.)
 - Manifest-based project management
@@ -16,10 +17,15 @@ I may port this to a minecraft server manager because I have been looking for on
 ## Usage
 
 ```sh
-mod init [DIRECTORY]           # Create a new project manifest
-mod add <slug> [--to DIR]      # Add a mod by slug
+mod init [--mc, --loader]      # Create a new project manifest
+                               # --mc [version/latest]
+                               # --loader 
+                               # --neoforge, --forge, --fabric, --quilt
+mod add <slug>                 # Add a mod by slug
 mod remove <slug>              # Remove and delete an item from the manifest
-mod search <query>             # Search for an item on Modrinth
+mod search <query>  [-m, -r, -s, -l]  
+                               # Search for an item on Modrinth 
+                               # --mod --resourcepack --shader --limit
 mod list                       # List all manifest entries
 mod enable <slug> [...]        # Enable mods
 mod disable <slug> [...]       # Disable mods
