@@ -62,7 +62,7 @@ func init() {
 	addCmd.Flags().StringVar(
 		&dest,
 		"to",
-		"", // no default ⇒ auto-infer
+		"",
 		"destination folder (mods, resourcepacks, shaderpacks). Leave blank to infer from project type.",
 	)
 }
